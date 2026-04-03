@@ -1,0 +1,21 @@
+# Xcode
+*.xcodeproj
+xcuserdata/
+DerivedData/
+*.xcworkspace
+build/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# macOS
+.DS_Store
+
+# Secrets
+.netrc
+scripts/sparkle_private_key
+
+# Release artifacts
+*.dmg

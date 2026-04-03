@@ -1,0 +1,62 @@
+name: Compressy
+options:
+  bundleIdPrefix: com.compressy
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  DockProgress:
+    url: https://github.com/sindresorhus/DockProgress
+    from: "5.0.0"
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "2.0.0"
+  SettingsAccess:
+    url: https://github.com/orchetect/SettingsAccess
+    from: "2.0.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.0.0"
+
+targets:
+  Compressy:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Compressy
+    dependencies:
+      - package: DockProgress
+      - package: KeyboardShortcuts
+      - package: SettingsAccess
+      - package: Sparkle
+    info:
+      path: Sources/Compressy/Info.plist
+      properties:
+        CFBundleDisplayName: Compressy
+        CFBundleName: Compressy
+        CFBundleIdentifier: com.compressy.app
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.utilities
+        CFBundleIconName: AppIcon
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        SUFeedURL: "https://raw.githubusercontent.com/treboryx/compressy/main/appcast.xml"
+        SUPublicEDKey: "cQfYfdvb6sjUuLXlJcbuPi8DPB+03gbEsRUXZsDzUaI="
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.compressy.app
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        PRODUCT_NAME: Compressy
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_CFBundleDisplayName: Compressy
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: false
+        ENABLE_APP_SANDBOX: false

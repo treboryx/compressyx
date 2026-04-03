@@ -1,0 +1,185 @@
+# Compressy
+
+A native macOS app for batch video and image compression. Built with SwiftUI, powered by FFmpeg and pngquant.
+
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
+![Swift 6](https://img.shields.io/badge/Swift-6-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+## Features
+
+- **Video compression** with hardware-accelerated H.264/H.265 encoding via VideoToolbox
+- **Image compression** for PNG (pngquant), JPEG, HEIC, WebP, TIFF, and BMP
+- **Drag and drop** files or folders directly into the app
+- **Batch processing** — queue multiple files and compress them all at once
+- **Quality presets** — Highest, High, Medium, Low
+- **Output formats** — MP4, MOV, MKV, WebM, or same as input
+- **Real-time progress** in the app and in the Dock icon
+- **Cancellation** — stop individual files or the entire batch
+- **Retry failed** items with one click
+- **Customizable keyboard shortcuts**
+- **Auto-updates** via Sparkle
+- **One-click dependency installation** from Settings
+
+### Supported Formats
+
+| Type  | Formats                                          |
+|-------|--------------------------------------------------|
+| Video | MP4, MOV, M4V, AVI, MKV, WebM, WMV, FLV        |
+| Image | JPG, JPEG, PNG, HEIC, HEIF, WebP, TIFF, BMP     |
+
+## Screenshots
+
+<!-- Add screenshots here -->
+<!-- ![Main Window](screenshots/main.png) -->
+<!-- ![Settings](screenshots/settings.png) -->
+
+## Requirements
+
+- macOS 14.0 (Sonoma) or later
+- Xcode 16+ (to build)
+- [Homebrew](https://brew.sh) (for dependencies)
+
+### Runtime Dependencies
+
+| Dependency | Purpose | Install |
+|------------|---------|---------|
+| [FFmpeg](https://ffmpeg.org) | Video compression | `brew install ffmpeg` |
+| [pngquant](https://pngquant.org) | PNG compression | `brew install pngquant` |
+
+> Both can also be installed from the app's **Settings → Dependencies** tab with one click.
+
+## Getting Started
+
+### 1. Clone
+
+```bash
+git clone https://github.com/treboryx/compressy.git
+cd compressy
+```
+
+### 2. Install build tools
+
+```bash
+brew install xcodegen
+```
+
+### 3. Generate Xcode project
+
+```bash
+xcodegen generate
+```
+
+### 4. Open and run
+
+```bash
+open Compressy.xcodeproj
+```
+
+Then press **Cmd+R** in Xcode to build and run.
+
+### 5. Install runtime dependencies
+
+Either from the terminal:
+
+```bash
+brew install ffmpeg pngquant
+```
+
+Or from within the app: **Settings → Dependencies → Install**.
+
+## Keyboard Shortcuts
+
+| Action     | Default Shortcut |
+|------------|-----------------|
+| Add Files  | `Cmd+O`        |
+| Compress All | `Cmd+Return` |
+| Cancel     | `Cmd+.`        |
+
+All shortcuts are customizable in **Settings → Shortcuts**.
+
+## Settings
+
+| Option | Description |
+|--------|-------------|
+| Video Codec | H.264 or H.265 (HEVC) |
+| Quality Preset | Highest / High / Medium / Low |
+| Output Format | Same as input, MP4, MOV, MKV, or WebM |
+| Output Folder | Same directory as source, or a custom folder |
+| Remove Input File | Delete the original after successful compression |
+
+## Architecture
+
+```
+Sources/Compressy/
+├── CompressyApp.swift          # App entry point, Sparkle updater
+├── Models/
+│   ├── CompressionItem.swift   # File state, progress, cancellation
+│   ├── CompressionQueue.swift  # Batch queue, dock progress
+│   └── CompressionSettings.swift # Codecs, quality, output prefs
+├── Services/
+│   ├── VideoCompressor.swift   # FFmpeg wrapper with progress parsing
+│   ├── ImageCompressor.swift   # pngquant + native image APIs
+│   └── ThumbnailGenerator.swift
+├── Views/
+│   ├── ContentView.swift       # Main window layout
+│   ├── DropZoneView.swift      # Drag-and-drop target
+│   ├── FileListView.swift      # Queue display
+│   ├── FileRowView.swift       # Individual file row
+│   ├── SettingsView.swift      # Tabbed settings window
+│   └── UpdaterView.swift       # Check for Updates menu item
+└── Utils/
+    ├── FileUtils.swift         # File type detection, size formatting
+    └── Shortcuts.swift         # Keyboard shortcut definitions
+```
+
+### How It Works
+
+- **Video**: Shells out to `ffmpeg` using `hevc_videotoolbox` (H.265) or `h264_videotoolbox` (H.264) for hardware-accelerated encoding. Falls back to software CRF encoding for WebM (VP9). Progress is parsed from FFmpeg's pipe output.
+- **Images**: PNG files go through `pngquant` for lossy compression. JPEG, HEIC, WebP, and other formats use native `CGImage`/`CIContext` APIs with configurable quality.
+- **Concurrency**: Swift 6 strict concurrency with `@Observable` and `@MainActor`. Compression runs in background tasks with cancellation support via `Process.terminate()`.
+
+## Releasing
+
+Releases happen **automatically** on every push to `main`. The GitHub Actions workflow will:
+
+1. Extract the version from `project.yml`
+2. Build a Release configuration
+3. Create a DMG with an `/Applications` symlink
+4. Create a GitHub release with the DMG attached
+5. Update `appcast.xml` for Sparkle auto-updates
+6. Push the updated appcast back to `main`
+
+If a release for the current version already exists, the workflow skips — so bump `MARKETING_VERSION` and `CFBundleShortVersionString` in `project.yml` before pushing to create a new release.
+
+### Manual releases
+
+A release script is also included for local builds:
+
+```bash
+export GITHUB_REPO="treboryx/compressy"
+./scripts/release.sh 1.0.1
+```
+
+### First-time setup
+
+Generate Sparkle signing keys (stored in your Keychain):
+
+```bash
+./scripts/generate-keys.sh
+```
+
+Copy the public key to `project.yml` → `SUPublicEDKey`.
+
+## Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| [Sparkle](https://github.com/sparkle-project/Sparkle) | 2.0+ | Auto-updates |
+| [DockProgress](https://github.com/sindresorhus/DockProgress) | 5.0+ | Dock icon progress bar |
+| [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) | 2.0+ | Customizable shortcuts |
+| [SettingsAccess](https://github.com/orchetect/SettingsAccess) | 2.0+ | macOS Settings window |
+
+## License
+
+MIT

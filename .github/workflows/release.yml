@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "appcast.xml"
+      - "**.md"
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: Compressy
+  SCHEME: Compressy
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install tools
+        run: brew install xcodegen
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep 'MARKETING_VERSION:' project.yml | head -1 | sed 's/.*: *"\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Check if release already exists
+        id: check
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" &>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release v${{ steps.version.outputs.version }} already exists, skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Xcode project
+        if: steps.check.outputs.exists == 'false'
+        run: xcodegen generate
+
+      - name: Build release
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          xcodebuild -project ${{ env.APP_NAME }}.xcodeproj \
+            -scheme ${{ env.SCHEME }} \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            clean build
+
+      - name: Create DMG
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          APP_PATH="build/Build/Products/Release/${{ env.APP_NAME }}.app"
+          DMG_NAME="${{ env.APP_NAME }}-${VERSION}.dmg"
+
+          mkdir -p build/dmg
+          cp -R "$APP_PATH" build/dmg/
+          ln -s /Applications build/dmg/Applications
+          hdiutil create -volname "${{ env.APP_NAME }}" \
+            -srcfolder build/dmg \
+            -ov -format UDZO \
+            "build/$DMG_NAME"
+
+          echo "dmg_path=build/$DMG_NAME" >> "$GITHUB_ENV"
+          echo "dmg_name=$DMG_NAME" >> "$GITHUB_ENV"
+
+      - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v${VERSION}" "${{ env.dmg_path }}" \
+            --title "${{ env.APP_NAME }} v${VERSION}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update appcast.xml
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+          DMG_NAME="${{ env.dmg_name }}"
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${DMG_NAME}"
+          DMG_SIZE=$(stat -f%z "${{ env.dmg_path }}")
+          PUB_DATE=$(date -R)
+
+          # Generate EdDSA signature if key is available
+          SIGNATURE=""
+          if [ -n "${{ secrets.SPARKLE_PRIVATE_KEY }}" ]; then
+            echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" > /tmp/sparkle_key
+            SIGNATURE=$(cat "${{ env.dmg_path }}" | openssl dgst -sha512 -sign /tmp/sparkle_key | base64)
+            rm -f /tmp/sparkle_key
+          fi
+
+          cat > appcast.xml << EOF
+          <?xml version="1.0" standalone="yes"?>
+          <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+              <channel>
+                  <title>${{ env.APP_NAME }}</title>
+                  <description>${{ env.APP_NAME }} update feed</description>
+                  <language>en</language>
+                  <item>
+                      <title>Version ${VERSION}</title>
+                      <sparkle:version>${VERSION}</sparkle:version>
+                      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                      <pubDate>${PUB_DATE}</pubDate>
+                      <enclosure
+                          url="${DOWNLOAD_URL}"
+                          length="${DMG_SIZE}"
+                          type="application/octet-stream"
+                          sparkle:edSignature="${SIGNATURE}" />
+                  </item>
+              </channel>
+          </rss>
+          EOF
+
+      - name: Commit and push appcast
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git diff --cached --quiet && exit 0
+          git commit -m "Update appcast.xml for v${{ steps.version.outputs.version }}"
+          git push
