@@ -15,7 +15,7 @@ enum ThumbnailGenerator {
         }
     }
 
-    nonisolated private static func generate_video_thumbnail(url: URL) async -> NSImage? {
+    private static func generate_video_thumbnail(url: URL) async -> NSImage? {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
@@ -23,9 +23,7 @@ enum ThumbnailGenerator {
 
         do {
             let (cg_image, _) = try await generator.image(at: .zero)
-            return await MainActor.run {
-                NSImage(cgImage: cg_image, size: thumbnail_size)
-            }
+            return NSImage(cgImage: cg_image, size: thumbnail_size)
         } catch {
             return nil
         }
