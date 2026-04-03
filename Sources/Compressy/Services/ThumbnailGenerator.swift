@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Foundation
 
+@MainActor
 enum ThumbnailGenerator {
     static let thumbnail_size = NSSize(width: 48, height: 48)
 
@@ -14,16 +15,17 @@ enum ThumbnailGenerator {
         }
     }
 
-    private static func generate_video_thumbnail(url: URL) async -> NSImage? {
+    nonisolated private static func generate_video_thumbnail(url: URL) async -> NSImage? {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: thumbnail_size.width * 2, height: thumbnail_size.height * 2)
+        generator.maximumSize = CGSize(width: 96, height: 96)
 
         do {
-            let (image, _) = try await generator.image(at: .zero)
-            let ns_image = NSImage(cgImage: image, size: thumbnail_size)
-            return ns_image
+            let (cg_image, _) = try await generator.image(at: .zero)
+            return await MainActor.run {
+                NSImage(cgImage: cg_image, size: thumbnail_size)
+            }
         } catch {
             return nil
         }

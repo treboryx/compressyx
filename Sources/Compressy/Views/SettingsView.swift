@@ -217,7 +217,8 @@ struct SettingsView: View {
     private func install_ffmpeg() {
         installing_ffmpeg = true
         install_error = nil
-        run_brew_install("ffmpeg") { success in
+        Task {
+            let success = await run_brew_install("ffmpeg")
             installing_ffmpeg = false
             ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
             if !success && !ffmpeg_installed {
@@ -229,7 +230,8 @@ struct SettingsView: View {
     private func install_pngquant() {
         installing_pngquant = true
         install_error = nil
-        run_brew_install("pngquant") { success in
+        Task {
+            let success = await run_brew_install("pngquant")
             installing_pngquant = false
             pngquant_installed = ImageCompressor.find_pngquant() != nil
             if !success && !pngquant_installed {
@@ -238,38 +240,28 @@ struct SettingsView: View {
         }
     }
 
-    private func run_brew_install(_ package: String, completion: @escaping @Sendable (Bool) -> Void) {
+    private nonisolated func run_brew_install(_ package: String) async -> Bool {
         let brew_paths = [
             "/opt/homebrew/bin/brew",
             "/usr/local/bin/brew"
         ]
 
         guard let brew_path = brew_paths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            install_error = "Homebrew not found. Install from https://brew.sh"
-            installing_ffmpeg = false
-            installing_pngquant = false
-            return
+            return false
         }
 
-        Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: brew_path)
-            process.arguments = ["install", package]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: brew_path)
+        process.arguments = ["install", package]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
 
-            do {
-                try process.run()
-                process.waitUntilExit()
-                let success = process.terminationStatus == 0
-                Task { @MainActor in
-                    completion(success)
-                }
-            } catch {
-                Task { @MainActor in
-                    completion(false)
-                }
-            }
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
         }
     }
 
