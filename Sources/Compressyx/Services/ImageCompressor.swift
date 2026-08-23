@@ -7,6 +7,7 @@ enum ImageCompressorError: LocalizedError {
     case compression_failed(String)
     case unsupported_format(String)
     case image_load_failed
+    case cwebp_not_found
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +19,8 @@ enum ImageCompressorError: LocalizedError {
             return "Unsupported format: \(ext)"
         case .image_load_failed:
             return "Could not load image"
+        case .cwebp_not_found:
+            return "cwebp not found. Install via: brew install webp"
         }
     }
 }
@@ -26,13 +29,14 @@ struct ImageCompressionParams: Sendable {
     let quality: Double
     let pngquant_range: String
     let output_url: URL
+    let target_format: ImageOutputFormat
 }
 
 enum ImageCompressor {
-    static func find_pngquant() -> URL? {
+    private static func find_tool(_ name: String) -> URL? {
         let paths = [
-            "/opt/homebrew/bin/pngquant",
-            "/usr/local/bin/pngquant"
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)"
         ]
         for path in paths {
             if FileManager.default.fileExists(atPath: path) {
@@ -42,35 +46,89 @@ enum ImageCompressor {
         return nil
     }
 
+    static func find_pngquant() -> URL? {
+        find_tool("pngquant")
+    }
+
+    static func find_cwebp() -> URL? {
+        find_tool("cwebp")
+    }
+
+    /// TIFF and BMP have no ImageOutputFormat case, so they fall back to JPEG.
+    private static func resolve_format(input_url: URL, target: ImageOutputFormat) throws -> ImageOutputFormat {
+        let ext = input_url.pathExtension.lowercased()
+        guard FileUtils.supported_image_types.contains(ext) else {
+            throw ImageCompressorError.unsupported_format(ext)
+        }
+        guard target == .same_as_input else { return target }
+
+        switch ext {
+        case "png": return .png
+        case "jpg", "jpeg": return .jpeg
+        case "heic", "heif": return .heic
+        case "webp": return .webp
+        default: return .jpeg
+        }
+    }
+
     static func compress(
         input_url: URL,
         params: ImageCompressionParams,
         on_process: @escaping @Sendable (Process) -> Void = { _ in }
     ) async throws -> URL {
-        let ext = input_url.pathExtension.lowercased()
+        let format = try resolve_format(input_url: input_url, target: params.target_format)
 
-        switch ext {
-        case "png":
+        switch format {
+        case .png:
             try await compress_png(input: input_url, output: params.output_url, pngquant_range: params.pngquant_range, on_process: on_process)
-        case "jpg", "jpeg":
+        case .jpeg:
             try compress_jpeg(input: input_url, output: params.output_url, quality: params.quality)
-        case "heic", "heif":
+        case .heic:
             try compress_heif(input: input_url, output: params.output_url, quality: params.quality)
-        case "webp":
-            try compress_webp(input: input_url, output: params.output_url, quality: params.quality)
-        case "tiff", "tif", "bmp":
-            let jpg_output = params.output_url.deletingPathExtension().appendingPathExtension("jpg")
-            try compress_jpeg(input: input_url, output: jpg_output, quality: params.quality)
-        default:
-            throw ImageCompressorError.unsupported_format(ext)
+        case .webp:
+            try await compress_webp(input: input_url, output: params.output_url, quality: params.quality, on_process: on_process)
+        case .same_as_input:
+            throw ImageCompressorError.unsupported_format(input_url.pathExtension)
+        }
+
+        guard FileManager.default.fileExists(atPath: params.output_url.path) else {
+            throw ImageCompressorError.compression_failed(
+                "Encoder produced no output at \(params.output_url.lastPathComponent)"
+            )
         }
 
         return params.output_url
     }
 
+    /// pngquant only reads PNG, so a non-PNG source is transcoded to a temp PNG first.
+    private static func png_source(for input: URL) throws -> (url: URL, is_temporary: Bool) {
+        guard input.pathExtension.lowercased() != "png" else { return (input, false) }
+
+        guard let image = NSImage(contentsOf: input),
+              let tiff_data = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff_data),
+              let png_data = bitmap.representation(using: .png, properties: [:])
+        else {
+            throw ImageCompressorError.image_load_failed
+        }
+
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("png")
+        try png_data.write(to: temp)
+        return (temp, true)
+    }
+
     private static func compress_png(input: URL, output: URL, pngquant_range: String, on_process: @escaping @Sendable (Process) -> Void) async throws {
         guard let pngquant = find_pngquant() else {
             throw ImageCompressorError.pngquant_not_found
+        }
+
+        let source = try png_source(for: input)
+        defer {
+            if source.is_temporary {
+                try? FileManager.default.removeItem(at: source.url)
+            }
         }
 
         let process = Process()
@@ -79,7 +137,7 @@ enum ImageCompressor {
             "--quality", pngquant_range,
             "--force",
             "--output", output.path,
-            input.path
+            source.url.path
         ]
 
         let stderr_pipe = Pipe()
@@ -101,7 +159,47 @@ enum ImageCompressor {
         }
 
         if !FileManager.default.fileExists(atPath: output.path) {
-            try FileManager.default.copyItem(at: input, to: output)
+            try FileManager.default.copyItem(at: source.url, to: output)
+        }
+    }
+
+    private static func compress_webp(input: URL, output: URL, quality: Double, on_process: @escaping @Sendable (Process) -> Void) async throws {
+        guard let cwebp = find_cwebp() else {
+            throw ImageCompressorError.cwebp_not_found
+        }
+
+        // cwebp reads PNG/JPEG/TIFF only, so HEIC and friends go through the PNG transcode.
+        let source = try png_source(for: input)
+        defer {
+            if source.is_temporary {
+                try? FileManager.default.removeItem(at: source.url)
+            }
+        }
+
+        let process = Process()
+        process.executableURL = cwebp
+        process.arguments = [
+            "-q", "\(Int((quality * 100).rounded()))",
+            source.url.path,
+            "-o", output.path
+        ]
+
+        let stderr_pipe = Pipe()
+        process.standardError = stderr_pipe
+
+        try process.run()
+        on_process(process)
+        process.waitUntilExit()
+
+        if process.terminationReason == .uncaughtSignal {
+            try? FileManager.default.removeItem(at: output)
+            throw ImageCompressorError.compression_failed("Cancelled")
+        }
+
+        guard process.terminationStatus == 0 else {
+            let error_data = stderr_pipe.fileHandleForReading.readDataToEndOfFile()
+            let msg = String(data: error_data, encoding: .utf8) ?? "Unknown error"
+            throw ImageCompressorError.compression_failed(msg)
         }
     }
 
@@ -145,18 +243,4 @@ enum ImageCompressor {
         )
     }
 
-    private static func compress_webp(input: URL, output: URL, quality: Double) throws {
-        guard let image = NSImage(contentsOf: input),
-              let tiff_data = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff_data)
-        else {
-            throw ImageCompressorError.image_load_failed
-        }
-
-        let quality_factor = quality
-        if let jpeg_data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: quality_factor]) {
-            let jpeg_output = output.deletingPathExtension().appendingPathExtension("jpg")
-            try jpeg_data.write(to: jpeg_output)
-        }
-    }
 }

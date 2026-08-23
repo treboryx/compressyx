@@ -7,9 +7,21 @@ struct SettingsView: View {
 
     @State private var ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
     @State private var pngquant_installed = ImageCompressor.find_pngquant() != nil
-    @State private var installing_ffmpeg = false
-    @State private var installing_pngquant = false
+    @State private var cwebp_installed = ImageCompressor.find_cwebp() != nil
+    @State private var installing: Set<String> = []
     @State private var install_error: String?
+
+    private var missing_packages: [String] {
+        var packages: [String] = []
+        if !ffmpeg_installed { packages.append("ffmpeg") }
+        if !pngquant_installed { packages.append("pngquant") }
+        if !cwebp_installed { packages.append("webp") }
+        return packages
+    }
+
+    private var homebrew_installed: Bool {
+        Dependencies.find_brew() != nil
+    }
 
     var body: some View {
         TabView {
@@ -133,18 +145,27 @@ struct SettingsView: View {
                     name: "FFmpeg",
                     purpose: "Video compression",
                     is_installed: ffmpeg_installed,
-                    is_installing: installing_ffmpeg,
+                    is_installing: installing.contains("ffmpeg"),
                     path: VideoCompressor.find_ffmpeg()?.path,
-                    install_action: install_ffmpeg
+                    install_action: { install(["ffmpeg"]) }
                 )
 
                 dependency_row(
                     name: "pngquant",
                     purpose: "PNG compression",
                     is_installed: pngquant_installed,
-                    is_installing: installing_pngquant,
+                    is_installing: installing.contains("pngquant"),
                     path: ImageCompressor.find_pngquant()?.path,
-                    install_action: install_pngquant
+                    install_action: { install(["pngquant"]) }
+                )
+
+                dependency_row(
+                    name: "cwebp",
+                    purpose: "WebP compression",
+                    is_installed: cwebp_installed,
+                    is_installing: installing.contains("webp"),
+                    path: ImageCompressor.find_cwebp()?.path,
+                    install_action: { install(["webp"]) }
                 )
 
                 if let error = install_error {
@@ -154,13 +175,52 @@ struct SettingsView: View {
                 }
             }
 
+            if !missing_packages.isEmpty {
+                Section {
+                    if homebrew_installed {
+                        Button {
+                            install(missing_packages)
+                        } label: {
+                            if installing.isEmpty {
+                                Label(
+                                    "Install All Missing (\(missing_packages.count))",
+                                    systemImage: "arrow.down.circle.fill"
+                                )
+                            } else {
+                                HStack(spacing: 6) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Installing \(installing.sorted().joined(separator: ", "))...")
+                                }
+                            }
+                        }
+                        .disabled(!installing.isEmpty)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Homebrew is required", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text("Compressyx installs these tools with Homebrew. Install it first, then come back.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Link("Get Homebrew", destination: URL(string: Dependencies.homebrew_url)!)
+                                .font(.caption)
+                        }
+                    }
+                }
+            }
+
             Section {
-                Text("Dependencies are installed via Homebrew. If you don't have Homebrew, visit https://brew.sh")
+                if missing_packages.isEmpty {
+                    Label("All tools installed", systemImage: "checkmark.seal.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+                Text("Compressyx works without these, but each unlocks a format: FFmpeg for video, pngquant for PNG, cwebp for WebP.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
         }
         .formStyle(.grouped)
+        .onAppear(perform: refresh_installed)
     }
 
     // MARK: - Dependency Row
@@ -214,54 +274,26 @@ struct SettingsView: View {
 
     // MARK: - Actions
 
-    private func install_ffmpeg() {
-        installing_ffmpeg = true
-        install_error = nil
-        Task {
-            let success = await run_brew_install("ffmpeg")
-            installing_ffmpeg = false
-            ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
-            if !success && !ffmpeg_installed {
-                install_error = "Failed to install FFmpeg. Run 'brew install ffmpeg' manually."
-            }
-        }
+    private func refresh_installed() {
+        ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
+        pngquant_installed = ImageCompressor.find_pngquant() != nil
+        cwebp_installed = ImageCompressor.find_cwebp() != nil
     }
 
-    private func install_pngquant() {
-        installing_pngquant = true
+    private func install(_ packages: [String]) {
+        guard installing.isEmpty else { return }
+        installing = Set(packages)
         install_error = nil
+
         Task {
-            let success = await run_brew_install("pngquant")
-            installing_pngquant = false
-            pngquant_installed = ImageCompressor.find_pngquant() != nil
-            if !success && !pngquant_installed {
-                install_error = "Failed to install pngquant. Run 'brew install pngquant' manually."
+            let success = await Dependencies.install(packages)
+            installing = []
+            refresh_installed()
+
+            if !success && !missing_packages.isEmpty {
+                let still_missing = missing_packages.joined(separator: " ")
+                install_error = "Install failed. Run 'brew install \(still_missing)' in Terminal."
             }
-        }
-    }
-
-    private nonisolated func run_brew_install(_ package: String) async -> Bool {
-        let brew_paths = [
-            "/opt/homebrew/bin/brew",
-            "/usr/local/bin/brew"
-        ]
-
-        guard let brew_path = brew_paths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            return false
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: brew_path)
-        process.arguments = ["install", package]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
         }
     }
 

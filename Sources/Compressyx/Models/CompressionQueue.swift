@@ -201,7 +201,8 @@ final class CompressionQueue {
                 let params = ImageCompressionParams(
                     quality: settings.quality_preset.image_quality,
                     pngquant_range: settings.quality_preset.pngquant_range,
-                    output_url: output_url
+                    output_url: output_url,
+                    target_format: settings.image_output_format
                 )
                 output = try await ImageCompressor.compress(
                     input_url: input_url,

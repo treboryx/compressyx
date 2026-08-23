@@ -1,6 +1,6 @@
 # Compressyx
 
-A native macOS app for batch video and image compression. Built with SwiftUI, powered by FFmpeg and pngquant.
+A native macOS app for batch video and image compression. Built with SwiftUI, powered by FFmpeg, pngquant, and cwebp.
 
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
 ![Swift 6](https://img.shields.io/badge/Swift-6-orange)
@@ -9,17 +9,17 @@ A native macOS app for batch video and image compression. Built with SwiftUI, po
 ## Features
 
 - **Video compression** with hardware-accelerated H.264/H.265 encoding via VideoToolbox
-- **Image compression** for PNG (pngquant), JPEG, HEIC, WebP, TIFF, and BMP
+- **Image compression** for PNG (pngquant), JPEG, HEIC, WebP (cwebp), TIFF, and BMP
 - **Drag and drop** files or folders directly into the app
 - **Batch processing** — queue multiple files and compress them all at once
 - **Quality presets** — Highest, High, Medium, Low
-- **Output formats** — MP4, MOV, MKV, WebM, or same as input
+- **Output formats** — video: MP4, MOV, MKV, WebM; image: JPEG, PNG, HEIC, WebP; or same as input
 - **Real-time progress** in the app and in the Dock icon
 - **Cancellation** — stop individual files or the entire batch
 - **Retry failed** items with one click
 - **Customizable keyboard shortcuts**
 - **Auto-updates** via Sparkle
-- **One-click dependency installation** from Settings
+- **One-click dependency installation** from Settings — install all missing tools at once
 
 ### Supported Formats
 
@@ -46,6 +46,7 @@ A native macOS app for batch video and image compression. Built with SwiftUI, po
 |------------|---------|---------|
 | [FFmpeg](https://ffmpeg.org) | Video compression | `brew install ffmpeg` |
 | [pngquant](https://pngquant.org) | PNG compression | `brew install pngquant` |
+| [cwebp](https://developers.google.com/speed/webp) | WebP compression | `brew install webp` |
 
 > Both can also be installed from the app's **Settings → Dependencies** tab with one click.
 
@@ -83,7 +84,7 @@ Then press **Cmd+R** in Xcode to build and run.
 Either from the terminal:
 
 ```bash
-brew install ffmpeg pngquant
+brew install ffmpeg pngquant webp
 ```
 
 Or from within the app: **Settings → Dependencies → Install**.
@@ -119,7 +120,7 @@ Sources/Compressyx/
 │   └── CompressionSettings.swift # Codecs, quality, output prefs
 ├── Services/
 │   ├── VideoCompressor.swift   # FFmpeg wrapper with progress parsing
-│   ├── ImageCompressor.swift   # pngquant + native image APIs
+│   ├── ImageCompressor.swift   # pngquant + cwebp + native image APIs
 │   └── ThumbnailGenerator.swift
 ├── Views/
 │   ├── ContentView.swift       # Main window layout
@@ -136,7 +137,7 @@ Sources/Compressyx/
 ### How It Works
 
 - **Video**: Shells out to `ffmpeg` using `hevc_videotoolbox` (H.265) or `h264_videotoolbox` (H.264) for hardware-accelerated encoding. Falls back to software CRF encoding for WebM (VP9). Progress is parsed from FFmpeg's pipe output.
-- **Images**: PNG files go through `pngquant` for lossy compression. JPEG, HEIC, WebP, and other formats use native `CGImage`/`CIContext` APIs with configurable quality.
+- **Images**: PNG output goes through `pngquant` and WebP output through `cwebp`; sources those tools can't read are transcoded to PNG first. JPEG and HEIC output use native `CGImage`/`CIContext` APIs with configurable quality. TIFF and BMP are decoded but written as JPEG when "same as input" is selected.
 - **Concurrency**: Swift 6 strict concurrency with `@Observable` and `@MainActor`. Compression runs in background tasks with cancellation support via `Process.terminate()`.
 
 ## Releasing

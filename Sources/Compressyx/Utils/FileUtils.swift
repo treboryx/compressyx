@@ -21,6 +21,12 @@ enum FileUtils {
         return supported_video_types.contains(ext) || supported_image_types.contains(ext)
     }
 
+    /// TIFF and BMP are decode-only here; keeping their extension would label JPEG bytes as TIFF.
+    static func same_as_input_extension(for source: URL) -> String {
+        let ext = source.pathExtension.lowercased()
+        return ["tiff", "tif", "bmp"].contains(ext) ? "jpg" : source.pathExtension
+    }
+
     static func file_size(url: URL) -> Int64 {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         return attrs?[.size] as? Int64 ?? 0
