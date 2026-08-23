@@ -1,4 +1,4 @@
-# Compressy
+# Compressyx
 
 A native macOS app for batch video and image compression. Built with SwiftUI, powered by FFmpeg and pngquant.
 
@@ -54,8 +54,8 @@ A native macOS app for batch video and image compression. Built with SwiftUI, po
 ### 1. Clone
 
 ```bash
-git clone https://github.com/treboryx/compressy.git
-cd compressy
+git clone https://github.com/treboryx/compressyx.git
+cd compressyx
 ```
 
 ### 2. Install build tools
@@ -73,7 +73,7 @@ xcodegen generate
 ### 4. Open and run
 
 ```bash
-open Compressy.xcodeproj
+open Compressyx.xcodeproj
 ```
 
 Then press **Cmd+R** in Xcode to build and run.
@@ -111,8 +111,8 @@ All shortcuts are customizable in **Settings → Shortcuts**.
 ## Architecture
 
 ```
-Sources/Compressy/
-├── CompressyApp.swift          # App entry point, Sparkle updater
+Sources/Compressyx/
+├── CompressyxApp.swift          # App entry point, Sparkle updater
 ├── Models/
 │   ├── CompressionItem.swift   # File state, progress, cancellation
 │   ├── CompressionQueue.swift  # Batch queue, dock progress
@@ -157,7 +157,7 @@ If a release for the current version already exists, the workflow skips — so b
 A release script is also included for local builds:
 
 ```bash
-export GITHUB_REPO="treboryx/compressy"
+export GITHUB_REPO="treboryx/compressyx"
 ./scripts/release.sh 1.0.1
 ```
 

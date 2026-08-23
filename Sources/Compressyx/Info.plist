@@ -5,17 +5,17 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Compressy</string>
+	<string>Compressyx</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.compressy.app</string>
+	<string>com.compressyx.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Compressy</string>
+	<string>Compressyx</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -32,7 +32,7 @@
 		<true/>
 	</dict>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/treboryx/compressy/main/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/treboryx/compressyx/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>cQfYfdvb6sjUuLXlJcbuPi8DPB+03gbEsRUXZsDzUaI=</string>
 </dict>

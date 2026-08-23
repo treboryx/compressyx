@@ -10,9 +10,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 env:
-  APP_NAME: Compressy
-  SCHEME: Compressy
+  APP_NAME: Compressyx
+  SCHEME: Compressyx
 
 jobs:
   release:
@@ -44,38 +48,154 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Import signing certificate
+        if: steps.check.outputs.exists == 'false'
+        id: signing
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          CERT="$RUNNER_TEMP/certificate.p12"
+
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERT"
+          if [ ! -s "$CERT" ]; then
+            echo "::error::BUILD_CERTIFICATE_BASE64 is empty or not valid base64."
+            exit 1
+          fi
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          security import "$CERT" -k "$KEYCHAIN" -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+
+          curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" \
+            https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$KEYCHAIN" || true
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk '/Developer ID Application/ {print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No Developer ID Application identity in the imported certificate."
+            security find-identity -v -p codesigning "$KEYCHAIN" || true
+            exit 1
+          fi
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          rm -f "$CERT"
+
       - name: Generate Xcode project
         if: steps.check.outputs.exists == 'false'
         run: xcodegen generate
 
-      - name: Build release
+      - name: Build
         if: steps.check.outputs.exists == 'false'
         run: |
-          xcodebuild -project ${{ env.APP_NAME }}.xcodeproj \
-            -scheme ${{ env.SCHEME }} \
+          set -euo pipefail
+          xcodebuild -project "${{ env.APP_NAME }}.xcodeproj" \
+            -scheme "${{ env.SCHEME }}" \
             -configuration Release \
             -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="${{ steps.signing.outputs.identity }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            ENABLE_HARDENED_RUNTIME=YES \
+            OTHER_CODE_SIGN_FLAGS="--timestamp" \
             clean build
+
+      - name: Sign app bundle
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          IDENTITY="${{ steps.signing.outputs.identity }}"
+          APP="build/Build/Products/Release/${{ env.APP_NAME }}.app"
+          sign() { codesign --force --timestamp --options runtime --sign "$IDENTITY" "$@"; }
+
+          # Sparkle's nested helpers are not reached by the outer bundle signature,
+          # so they must be signed inside-out before the framework and the app.
+          FW="$APP/Contents/Frameworks/Sparkle.framework"
+          if [ -d "$FW" ]; then
+            for XPC in "$FW/Versions/B/XPCServices/"*.xpc; do
+              [ -e "$XPC" ] && sign "$XPC"
+            done
+            [ -e "$FW/Versions/B/Autoupdate" ] && sign "$FW/Versions/B/Autoupdate"
+            [ -d "$FW/Versions/B/Updater.app" ] && sign "$FW/Versions/B/Updater.app"
+          fi
+          for F in "$APP/Contents/Frameworks/"*.framework; do
+            [ -d "$F" ] && sign "$F"
+          done
+          sign "$APP"
+
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+      - name: Notarize app
+        if: steps.check.outputs.exists == 'false'
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release/${{ env.APP_NAME }}.app"
+          KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$KEY"
+          if [ ! -s "$KEY" ]; then
+            echo "::error::NOTARY_KEY_BASE64 is empty or not valid base64."
+            exit 1
+          fi
+
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/app.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/app.zip" \
+            --key "$KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple "$APP"
 
       - name: Create DMG
         if: steps.check.outputs.exists == 'false'
         run: |
+          set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
-          APP_PATH="build/Build/Products/Release/${{ env.APP_NAME }}.app"
+          APP="build/Build/Products/Release/${{ env.APP_NAME }}.app"
           DMG_NAME="${{ env.APP_NAME }}-${VERSION}.dmg"
 
           mkdir -p build/dmg
-          cp -R "$APP_PATH" build/dmg/
+          cp -R "$APP" build/dmg/
           ln -s /Applications build/dmg/Applications
           hdiutil create -volname "${{ env.APP_NAME }}" \
             -srcfolder build/dmg \
             -ov -format UDZO \
             "build/$DMG_NAME"
 
+          codesign --force --timestamp --sign "${{ steps.signing.outputs.identity }}" "build/$DMG_NAME"
+
           echo "dmg_path=build/$DMG_NAME" >> "$GITHUB_ENV"
           echo "dmg_name=$DMG_NAME" >> "$GITHUB_ENV"
+
+      - name: Notarize DMG
+        if: steps.check.outputs.exists == 'false'
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit "${{ env.dmg_path }}" \
+            --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple "${{ env.dmg_path }}"
+
+      - name: Verify Gatekeeper acceptance
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          spctl --assess --type execute --verbose=4 "build/Build/Products/Release/${{ env.APP_NAME }}.app"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "${{ env.dmg_path }}"
 
       - name: Create GitHub release
         if: steps.check.outputs.exists == 'false'
@@ -89,20 +209,27 @@ jobs:
 
       - name: Update appcast.xml
         if: steps.check.outputs.exists == 'false'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
+          set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
-          REPO="${{ github.repository }}"
-          DMG_NAME="${{ env.dmg_name }}"
-          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${DMG_NAME}"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${{ env.dmg_name }}"
           DMG_SIZE=$(stat -f%z "${{ env.dmg_path }}")
           PUB_DATE=$(date -R)
 
-          # Generate EdDSA signature if key is available
-          SIGNATURE=""
-          if [ -n "${{ secrets.SPARKLE_PRIVATE_KEY }}" ]; then
-            echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" > /tmp/sparkle_key
-            SIGNATURE=$(cat "${{ env.dmg_path }}" | openssl dgst -sha512 -sign /tmp/sparkle_key | base64)
-            rm -f /tmp/sparkle_key
+          SIGN_UPDATE=$(find build/SourcePackages/artifacts -path "*Sparkle/bin/sign_update" -type f | head -1)
+          if [ -z "$SIGN_UPDATE" ]; then
+            echo "::error::sign_update not found in Sparkle artifacts."
+            exit 1
+          fi
+          KEY="$RUNNER_TEMP/sparkle_ed_key"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY"
+          SIGNATURE=$("$SIGN_UPDATE" --ed-key-file "$KEY" -p "${{ env.dmg_path }}")
+          rm -f "$KEY"
+          if [ -z "$SIGNATURE" ]; then
+            echo "::error::sign_update produced an empty signature."
+            exit 1
           fi
 
           cat > appcast.xml << EOF
@@ -137,3 +264,7 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Update appcast.xml for v${{ steps.version.outputs.version }}"
           git push
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true

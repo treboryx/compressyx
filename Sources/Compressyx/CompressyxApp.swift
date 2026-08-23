@@ -2,7 +2,7 @@ import Sparkle
 import SwiftUI
 
 @main
-struct CompressyApp: App {
+struct CompressyxApp: App {
     private let updater_controller: SPUStandardUpdaterController
 
     init() {

@@ -3,14 +3,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "Compressy",
+    name: "Compressyx",
     platforms: [
         .macOS(.v14)
     ],
     targets: [
         .executableTarget(
-            name: "Compressy",
-            path: "Sources/Compressy"
+            name: "Compressyx",
+            path: "Sources/Compressyx"
         )
     ]
 )

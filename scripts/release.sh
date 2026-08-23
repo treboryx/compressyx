@@ -1,23 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
-# Compressy Release Script
+# Compressyx Release Script
 # Usage: ./scripts/release.sh <version>
 # Example: ./scripts/release.sh 1.0.1
 #
 # Prerequisites:
-# 1. Set GITHUB_REPO (e.g., "yourusername/compressy")
+# 1. Set GITHUB_REPO (e.g., "yourusername/compressyx")
 # 2. Generate Sparkle EdDSA keys: ./scripts/generate-keys.sh
 # 3. gh CLI authenticated
 
 VERSION="${1:?Usage: ./scripts/release.sh <version>}"
-GITHUB_REPO="${GITHUB_REPO:?Set GITHUB_REPO env var (e.g., yourusername/compressy)}"
+GITHUB_REPO="${GITHUB_REPO:?Set GITHUB_REPO env var (e.g., yourusername/compressyx)}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="Compressy"
-DMG_NAME="Compressy-${VERSION}.dmg"
+APP_NAME="Compressyx"
+DMG_NAME="Compressyx-${VERSION}.dmg"
 
-echo "==> Building Compressy v${VERSION}..."
+echo "==> Building Compressyx v${VERSION}..."
 
 # Update version in project.yml
 sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"${VERSION}\"/" "$PROJECT_DIR/project.yml"
@@ -28,8 +28,8 @@ cd "$PROJECT_DIR"
 xcodegen generate
 
 # Build release
-xcodebuild -project "$PROJECT_DIR/Compressy.xcodeproj" \
-    -scheme Compressy \
+xcodebuild -project "$PROJECT_DIR/Compressyx.xcodeproj" \
+    -scheme Compressyx \
     -configuration Release \
     -derivedDataPath "$BUILD_DIR" \
     clean build
@@ -44,7 +44,7 @@ hdiutil create -volname "$APP_NAME" -srcfolder "$BUILD_DIR/dmg" -ov -format UDZO
 echo "==> Creating GitHub release..."
 gh release create "v${VERSION}" "$BUILD_DIR/$DMG_NAME" \
     --repo "$GITHUB_REPO" \
-    --title "Compressy v${VERSION}" \
+    --title "Compressyx v${VERSION}" \
     --generate-notes
 
 DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/${DMG_NAME}"
@@ -62,8 +62,8 @@ cat > "$PROJECT_DIR/appcast.xml" << EOF
 <?xml version="1.0" standalone="yes"?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
-        <title>Compressy</title>
-        <description>Compressy update feed</description>
+        <title>Compressyx</title>
+        <description>Compressyx update feed</description>
         <language>en</language>
         <item>
             <title>Version ${VERSION}</title>
