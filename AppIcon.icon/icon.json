@@ -1,0 +1,41 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.180,0.133,0.325,1.000",
+      "srgb:0.106,0.071,0.208,1.000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "chevrons.svg",
+          "fill" : {
+            "linear-gradient" : [
+              "srgb:1.000,1.000,1.000,1.000",
+              "srgb:0.714,0.620,1.000,1.000"
+            ]
+          }
+        }
+      ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "specular" : true
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "seam.svg",
+          "fill" : {
+            "linear-gradient" : [
+              "srgb:0.498,0.878,1.000,1.000",
+              "srgb:0.929,0.980,1.000,1.000"
+            ]
+          }
+        }
+      ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.6 },
+      "specular" : true
+    }
+  ],
+  "supported-platforms" : { "squares" : [ "macOS" ] }
+}

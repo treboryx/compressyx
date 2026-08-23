@@ -14,7 +14,7 @@ VERSION="${1:?Usage: ./scripts/release.sh <version>}"
 GITHUB_REPO="${GITHUB_REPO:?Set GITHUB_REPO env var (e.g., yourusername/compressyx)}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="Compressyx"
+APP_NAME="CompressyX"
 DMG_NAME="Compressyx-${VERSION}.dmg"
 
 echo "==> Building Compressyx v${VERSION}..."
@@ -28,8 +28,8 @@ cd "$PROJECT_DIR"
 xcodegen generate
 
 # Build release
-xcodebuild -project "$PROJECT_DIR/Compressyx.xcodeproj" \
-    -scheme Compressyx \
+xcodebuild -project "$PROJECT_DIR/CompressyX.xcodeproj" \
+    -scheme CompressyX \
     -configuration Release \
     -derivedDataPath "$BUILD_DIR" \
     clean build
@@ -44,7 +44,7 @@ hdiutil create -volname "$APP_NAME" -srcfolder "$BUILD_DIR/dmg" -ov -format UDZO
 echo "==> Creating GitHub release..."
 gh release create "v${VERSION}" "$BUILD_DIR/$DMG_NAME" \
     --repo "$GITHUB_REPO" \
-    --title "Compressyx v${VERSION}" \
+    --title "CompressyX v${VERSION}" \
     --generate-notes
 
 DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/${DMG_NAME}"
@@ -62,8 +62,8 @@ cat > "$PROJECT_DIR/appcast.xml" << EOF
 <?xml version="1.0" standalone="yes"?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
-        <title>Compressyx</title>
-        <description>Compressyx update feed</description>
+        <title>CompressyX</title>
+        <description>CompressyX update feed</description>
         <language>en</language>
         <item>
             <title>Version ${VERSION}</title>

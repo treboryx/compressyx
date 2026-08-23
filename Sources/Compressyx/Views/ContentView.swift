@@ -24,26 +24,19 @@ struct ContentView: View {
             sidebar_view
                 .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
         } detail: {
-            VStack(spacing: 0) {
-                toolbar_view
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-
-                Divider()
-
+            Group {
                 if queue.items.isEmpty {
                     DropZoneView(queue: queue)
                 } else {
                     VStack(spacing: 0) {
                         FileListView(queue: queue, settings: settings)
 
-                        Divider()
-
                         DropZoneView(queue: queue, compact: true)
-                            .frame(height: 60)
+                            .frame(height: 64)
                     }
                 }
             }
+            .toolbar { toolbar_content }
         }
         .frame(minWidth: 700, minHeight: 450)
         .onAppear {
@@ -218,7 +211,6 @@ struct ContentView: View {
             }
             .padding()
         }
-        .background(.ultraThinMaterial)
         .onAppear {
             ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
             pngquant_installed = ImageCompressor.find_pngquant() != nil
@@ -238,24 +230,26 @@ struct ContentView: View {
         }
     }
 
-    private var toolbar_view: some View {
-        HStack {
+    @ToolbarContentBuilder
+    private var toolbar_content: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
             Button {
                 open_file_panel()
             } label: {
                 Label("Add Files", systemImage: "plus")
             }
             .keyboardShortcut("o", modifiers: .command)
+            .help("Add files or folders")
+        }
 
-            Spacer()
-
-            if !queue.items.isEmpty {
+        if !queue.items.isEmpty {
+            ToolbarItem(placement: .principal) {
                 Text("\(queue.items.count) file\(queue.items.count == 1 ? "" : "s")")
                     .foregroundStyle(.secondary)
                     .font(.caption)
+            }
 
-                Spacer()
-
+            ToolbarItemGroup(placement: .primaryAction) {
                 if queue.is_processing {
                     Button {
                         queue.cancel_all()
@@ -287,6 +281,7 @@ struct ContentView: View {
                     } label: {
                         Label("Compress All", systemImage: "arrow.down.circle.fill")
                     }
+                    .buttonStyle(.glassProminent)
                     .disabled(queue.pending_count == 0)
                     .keyboardShortcut(.return, modifiers: .command)
                 }

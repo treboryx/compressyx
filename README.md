@@ -1,8 +1,8 @@
-# Compressyx
+# CompressyX
 
-A native macOS app for batch video and image compression. Built with SwiftUI, powered by FFmpeg, pngquant, and cwebp.
+A native macOS app for batch video and image compression, built for the Liquid Glass design system. Built with SwiftUI, powered by FFmpeg, pngquant, and cwebp.
 
-![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
+![macOS 26+](https://img.shields.io/badge/macOS-26%2B-blue)
 ![Swift 6](https://img.shields.io/badge/Swift-6-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

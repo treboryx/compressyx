@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "Compressyx",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
     ],
     targets: [
         .executableTarget(

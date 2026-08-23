@@ -40,6 +40,7 @@ struct FileListView: View {
                     }
             }
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
+        .listStyle(.inset)
+        .scrollEdgeEffectStyle(.soft, for: .all)
     }
 }

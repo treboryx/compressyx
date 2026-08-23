@@ -1,9 +1,38 @@
 # Changelog
 
-All notable changes to Compressyx are documented here.
+All notable changes to CompressyX are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.0.0] — 2026-08-23
+
+### Changed
+
+- **Renamed to CompressyX.** Display name only — the bundle identifier and the
+  update feed are unchanged, so existing installs keep updating normally.
+- **Rebuilt for Liquid Glass.** The app now targets macOS 26 and adopts the
+  current design system rather than approximating it: the window, sidebar and
+  controls are rendered as Liquid Glass by the system, the toolbar is a real
+  toolbar instead of a hand-rolled row, the primary action uses the prominent
+  glass button style, and the drop zone is an actual glass surface that tints
+  toward the accent colour on hover.
+- **New app icon**, authored as a layered Icon Composer document. The system
+  renders it with live specular highlights and depth and generates the Dark,
+  Clear and Tinted variants, instead of the previous flat image with the glass
+  effect painted in by hand.
+- The file list uses a soft scroll edge effect so content dissolves under the
+  toolbar rather than colliding with it, and no longer stripes alternating rows.
+
+### Removed
+
+- **Support for macOS 14 and 15.** Every Liquid Glass API is macOS 26 or newer
+  with no back-deployment, so supporting older systems would have meant
+  maintaining two separate visual designs. The update feed declares the new
+  minimum, so machines running macOS 14 or 15 stay on 1.1.0 rather than being
+  offered an update they cannot run.
+- The `.ultraThinMaterial` sidebar background, which was overriding the system's
+  own sidebar material.
 
 ## [1.1.0] — 2026-08-23
 
@@ -102,6 +131,7 @@ and notarized by Apple. Installs and updates without Gatekeeper warnings.
 - Customizable keyboard shortcuts.
 - Automatic updates via Sparkle.
 
+[2.0.0]: https://github.com/treboryx/compressyx/releases/tag/v2.0.0
 [1.1.0]: https://github.com/treboryx/compressyx/releases/tag/v1.1.0
 [1.0.2]: https://github.com/treboryx/compressyx/releases/tag/v1.0.2
 [1.0.1]: https://github.com/treboryx/compressyx/releases/tag/v1.0.1

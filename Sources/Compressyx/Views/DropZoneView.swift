@@ -26,18 +26,17 @@ struct DropZoneView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            RoundedRectangle(cornerRadius: compact ? 8 : 16)
-                .strokeBorder(
-                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
-                )
-                .foregroundStyle(is_hovering ? Color.accentColor : Color.secondary.opacity(0.3))
+        .glassEffect(
+            is_hovering ? .regular.tint(.accentColor) : .regular,
+            in: .rect(cornerRadius: compact ? 12 : 22)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: compact ? 12 : 22)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
+                .foregroundStyle(is_hovering ? Color.accentColor : Color.secondary.opacity(0.25))
         }
-        .background {
-            RoundedRectangle(cornerRadius: compact ? 8 : 16)
-                .fill(is_hovering ? Color.accentColor.opacity(0.05) : Color.clear)
-        }
-        .padding(compact ? 8 : 16)
+        .animation(.smooth(duration: 0.25), value: is_hovering)
+        .padding(compact ? 10 : 20)
         .onDrop(of: [.fileURL], isTargeted: $is_hovering) { providers in
             handle_drop(providers)
             return true

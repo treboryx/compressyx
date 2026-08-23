@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APP_NAME: Compressyx
-  SCHEME: Compressyx
+  APP_NAME: CompressyX
+  SCHEME: CompressyX
 
 jobs:
   release:
