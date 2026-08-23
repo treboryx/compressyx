@@ -20,7 +20,7 @@ env:
 
 jobs:
   release:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,6 +28,18 @@ jobs:
 
       - name: Install tools
         run: brew install xcodegen
+
+      - name: Verify the toolchain can target this deployment target
+        run: |
+          set -euo pipefail
+          TARGET=$(grep 'MACOSX_DEPLOYMENT_TARGET:' project.yml | head -1 | sed 's/.*: *"\(.*\)"/\1/')
+          SDK=$(xcrun --sdk macosx --show-sdk-version)
+          echo "deployment target $TARGET, macOS SDK $SDK, $(xcodebuild -version | head -1)"
+          # A too-old SDK fails deep in the Swift compile with a misleading error, so check up front.
+          if [ "$(printf '%s\n%s\n' "$TARGET" "$SDK" | sort -V | head -1)" != "$TARGET" ]; then
+            echo "::error::macOS SDK $SDK cannot build for deployment target $TARGET. Use a newer runner image."
+            exit 1
+          fi
 
       - name: Extract version
         id: version
