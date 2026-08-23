@@ -232,28 +232,15 @@ jobs:
             exit 1
           fi
 
-          cat > appcast.xml << EOF
-          <?xml version="1.0" standalone="yes"?>
-          <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-              <channel>
-                  <title>${{ env.APP_NAME }}</title>
-                  <description>${{ env.APP_NAME }} update feed</description>
-                  <language>en</language>
-                  <item>
-                      <title>Version ${VERSION}</title>
-                      <sparkle:version>${VERSION}</sparkle:version>
-                      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
-                      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-                      <pubDate>${PUB_DATE}</pubDate>
-                      <enclosure
-                          url="${DOWNLOAD_URL}"
-                          length="${DMG_SIZE}"
-                          type="application/octet-stream"
-                          sparkle:edSignature="${SIGNATURE}" />
-                  </item>
-              </channel>
-          </rss>
-          EOF
+          python3 scripts/make_appcast.py \
+            --version "$VERSION" \
+            --url "$DOWNLOAD_URL" \
+            --length "$DMG_SIZE" \
+            --signature "$SIGNATURE" \
+            --app-name "${{ env.APP_NAME }}" \
+            --pub-date "$PUB_DATE"
+
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('appcast.xml')"
 
       - name: Commit and push appcast
         if: steps.check.outputs.exists == 'false'
