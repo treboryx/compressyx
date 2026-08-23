@@ -1,15 +1,15 @@
 <?xml version="1.0" standalone="yes"?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
-        <title>Compressyx</title>
-        <description>Compressyx update feed</description>
+        <title>CompressyX</title>
+        <description>CompressyX update feed</description>
         <language>en</language>
         <item>
-            <title>Version 1.1.0</title>
-            <sparkle:version>1.1.0</sparkle:version>
-            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <pubDate>Sun, 23 Aug 2026 17:10:32 +0000</pubDate>
+            <title>Version 2.0.0</title>
+            <sparkle:version>2.0.0</sparkle:version>
+            <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <pubDate>Sun, 23 Aug 2026 19:36:39 +0000</pubDate>
             <description><![CDATA[<style>
 :root { color-scheme: light dark; }
 body {
@@ -27,12 +27,12 @@ code {
   padding: 0.1em 0.32em; border-radius: 4px;
 }
 @media (prefers-color-scheme: dark) { body { color: #f5f5f7; } }
-</style><h3>Added</h3><ul><li>Release notes in the update dialog. The appcast now carries the matching CHANGELOG section, so Sparkle shows what changed instead of a bare version number. Takes effect from the next release.</li><li><strong>Folders can be dropped on the app</strong>, and are expanded recursively. Hidden files are skipped and bundles such as <code>.photoslibrary</code> are not descended into. The README has claimed this since 1.0.0; it now works.</li><li><strong>Metadata control</strong> in Settings — <em>Preserve</em>, <em>Remove location</em>, or <em>Remove all</em>. Previous versions silently stripped every tag from every image, including the capture date, which is how Photos and the Finder sort images. The new default is <em>Preserve</em>.</li><li><strong>Advanced video options</strong>, behind a collapsed &quot;Advanced&quot; section in the sidebar: downscale to 4K/1440p/1080p/720p/480p, re-encode audio to AAC or remove it, and cap the frame rate. Downscaling never upscales a smaller source. Defaults leave every existing behaviour unchanged.</li></ul><h3>Fixed</h3><ul><li><strong>WebM output failed for every video with AAC audio.</strong> The audio track was stream-copied into a container that accepts only Vorbis and Opus, so ffmpeg aborted and no file was produced. WebM now encodes audio as Opus.</li><li>The main window&#x27;s dependency check ignored <code>cwebp</code>, so a missing WebP encoder went unreported until a job failed.</li><li>Dropping a folder and one of its own files in the same gesture queued that file twice.</li></ul><h3>Changed</h3><ul><li>Image metadata defaults changed from &quot;strip everything&quot; to &quot;preserve everything&quot;. If you relied on the old behaviour to remove GPS data, choose <em>Remove location</em> or <em>Remove all</em> in Settings.</li></ul>]]></description>
+</style><h3>Changed</h3><ul><li><strong>Renamed to CompressyX.</strong> Display name only — the bundle identifier and the update feed are unchanged, so existing installs keep updating normally.</li><li><strong>Rebuilt for Liquid Glass.</strong> The app now targets macOS 26 and adopts the current design system rather than approximating it: the window, sidebar and controls are rendered as Liquid Glass by the system, the toolbar is a real toolbar instead of a hand-rolled row, the primary action uses the prominent glass button style, and the drop zone is an actual glass surface that tints toward the accent colour on hover.</li><li><strong>New app icon</strong>, authored as a layered Icon Composer document. The system renders it with live specular highlights and depth and generates the Dark, Clear and Tinted variants, instead of the previous flat image with the glass effect painted in by hand.</li><li>The file list uses a soft scroll edge effect so content dissolves under the toolbar rather than colliding with it, and no longer stripes alternating rows.</li></ul><h3>Removed</h3><ul><li><strong>Support for macOS 14 and 15.</strong> Every Liquid Glass API is macOS 26 or newer with no back-deployment, so supporting older systems would have meant maintaining two separate visual designs. The update feed declares the new minimum, so machines running macOS 14 or 15 stay on 1.1.0 rather than being offered an update they cannot run.</li><li>The <code>.ultraThinMaterial</code> sidebar background, which was overriding the system&#x27;s own sidebar material.</li></ul>]]></description>
             <enclosure
-                url="https://github.com/treboryx/compressyx/releases/download/v1.1.0/Compressyx-1.1.0.dmg"
-                length="2924870"
+                url="https://github.com/treboryx/compressyx/releases/download/v2.0.0/CompressyX-2.0.0.dmg"
+                length="3706881"
                 type="application/octet-stream"
-                sparkle:edSignature="TeCCXrQU2a0Or00EeL5QNRpH3Gjy1ykFP0om7fAOIAtB3FdK1l9xCMOTvHbFtQTRBPNITwEELBB5MIhWGQIHAw==" />
+                sparkle:edSignature="6uOlpMhQQauiizLbj5G7NZgwBRZ6xghQi0dIl/2GCbI3kbZrdaGbkCdNotMybrr3XF1yEbRMMJ3/n0zS5053Cw==" />
         </item>
     </channel>
 </rss>
