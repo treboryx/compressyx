@@ -5,16 +5,16 @@
         <description>Compressyx update feed</description>
         <language>en</language>
         <item>
-            <title>Version 1.0.0</title>
-            <sparkle:version>1.0.0</sparkle:version>
-            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <title>Version 1.0.1</title>
+            <sparkle:version>1.0.1</sparkle:version>
+            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <pubDate>Sun, 23 Aug 2026 13:39:28 +0000</pubDate>
+            <pubDate>Sun, 23 Aug 2026 13:57:09 +0000</pubDate>
             <enclosure
-                url="https://github.com/treboryx/compressyx/releases/download/v1.0.0/Compressyx-1.0.0.dmg"
-                length="2310491"
+                url="https://github.com/treboryx/compressyx/releases/download/v1.0.1/Compressyx-1.0.1.dmg"
+                length="2856983"
                 type="application/octet-stream"
-                sparkle:edSignature="85a/x+cAESHpC+baBwje27y+A4AJ0k3XIEerh0qGIA+5ObYMYaCDLoBRGXZyNqlqbUP2BtR9PKorfH124RSFBQ==" />
+                sparkle:edSignature="HItXGiL9Pj/Egam7qtQZZuZfWeJdhNzA7YJR7p0EtuFbdCTsZBGPsBV08r43nZ40TXdjIBWghSrGE+K2GXgrBQ==" />
         </item>
     </channel>
 </rss>
