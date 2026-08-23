@@ -24,6 +24,9 @@ struct VideoCompressionParams: Sendable {
     let output_url: URL
     let use_crf: Bool  // true for software encoders (VP9), false for VideoToolbox
     let crf: Int
+    let max_height: Int?
+    let fps_cap: Int
+    let audio_args: [String]
 }
 
 enum VideoCompressor {
@@ -66,7 +69,18 @@ enum VideoCompressor {
             args.append(contentsOf: ["-q:v", "\(params.quality)"])
         }
 
-        args.append(contentsOf: ["-c:a", "copy", "-y", "-progress", "pipe:1"])
+        if let max_height = params.max_height {
+            // -2 keeps the width even (H.26x requires it); min() prevents upscaling a
+            // smaller source into a bigger file.
+            args.append(contentsOf: ["-vf", "scale=-2:'min(\(max_height),ih)'"])
+        }
+
+        if params.fps_cap > 0 {
+            args.append(contentsOf: ["-r", "\(params.fps_cap)"])
+        }
+
+        args.append(contentsOf: params.audio_args)
+        args.append(contentsOf: ["-y", "-progress", "pipe:1"])
 
         if params.is_h265 {
             args.append(contentsOf: ["-tag:v", "hvc1"])

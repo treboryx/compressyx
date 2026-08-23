@@ -43,11 +43,10 @@ final class CompressionQueue {
     // MARK: - Adding files
 
     func add_files(_ urls: [URL]) {
-        let existing_paths = Set(items.map { $0.url.path })
+        var existing_paths = Set(items.map { $0.url.path })
 
-        for url in urls {
-            guard FileUtils.is_supported(url: url) else { continue }
-            guard !existing_paths.contains(url.path) else { continue }
+        for url in FileUtils.expand(urls: urls) {
+            guard existing_paths.insert(url.path).inserted else { continue }
 
             let item = CompressionItem(url: url)
             items.append(item)
@@ -180,7 +179,10 @@ final class CompressionQueue {
                     is_h265: settings.video_codec == .h265 && !format.requires_software_encoder,
                     output_url: output_url,
                     use_crf: use_crf,
-                    crf: settings.quality_preset.crf
+                    crf: settings.quality_preset.crf,
+                    max_height: settings.video_resolution.max_height,
+                    fps_cap: settings.video_fps_cap,
+                    audio_args: settings.audio_handling.ffmpeg_args(webm: format == .webm)
                 )
                 output = try await VideoCompressor.compress(
                     input_url: input_url,
@@ -202,7 +204,8 @@ final class CompressionQueue {
                     quality: settings.quality_preset.image_quality,
                     pngquant_range: settings.quality_preset.pngquant_range,
                     output_url: output_url,
-                    target_format: settings.image_output_format
+                    target_format: settings.image_output_format,
+                    metadata_policy: settings.metadata_policy
                 )
                 output = try await ImageCompressor.compress(
                     input_url: input_url,

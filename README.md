@@ -10,9 +10,11 @@ A native macOS app for batch video and image compression. Built with SwiftUI, po
 
 - **Video compression** with hardware-accelerated H.264/H.265 encoding via VideoToolbox
 - **Image compression** for PNG (pngquant), JPEG, HEIC, WebP (cwebp), TIFF, and BMP
-- **Drag and drop** files or folders directly into the app
+- **Drag and drop** files or whole folders — folders are expanded recursively
 - **Batch processing** — queue multiple files and compress them all at once
 - **Quality presets** — Highest, High, Medium, Low
+- **Advanced video options** (behind "Advanced" in the sidebar) — downscale to 4K/1440p/1080p/720p/480p, re-encode or remove audio, cap the frame rate
+- **Metadata control** — preserve EXIF, remove just the GPS location, or strip everything
 - **Output formats** — video: MP4, MOV, MKV, WebM; image: JPEG, PNG, HEIC, WebP; or same as input
 - **Real-time progress** in the app and in the Dock icon
 - **Cancellation** — stop individual files or the entire batch
@@ -137,7 +139,9 @@ Sources/Compressyx/
 ### How It Works
 
 - **Video**: Shells out to `ffmpeg` using `hevc_videotoolbox` (H.265) or `h264_videotoolbox` (H.264) for hardware-accelerated encoding. Falls back to software CRF encoding for WebM (VP9). Progress is parsed from FFmpeg's pipe output.
-- **Images**: PNG output goes through `pngquant` and WebP output through `cwebp`; sources those tools can't read are transcoded to PNG first. JPEG and HEIC output use native `CGImage`/`CIContext` APIs with configurable quality. TIFF and BMP are decoded but written as JPEG when "same as input" is selected.
+- **Images**: JPEG and HEIC output go through ImageIO (`CGImageSource`/`CGImageDestination`), which carries EXIF and ICC through the re-encode. PNG output goes through `pngquant` and WebP through `cwebp`; sources those tools can't read are transcoded to PNG first. TIFF and BMP are decoded but written as JPEG when "same as input" is selected.
+- **Metadata**: *Preserve* keeps everything, *Remove location* drops the GPS block, *Remove all* strips every tag. Orientation always survives — under *Remove all* the rotation is baked into the pixels instead. **PNG output cannot carry metadata**: PNG has no EXIF container and `pngquant` discards ancillary chunks, so PNG output is always metadata-free regardless of the setting.
+- **Video downscaling** uses `scale=-2:'min(H,ih)'`, which preserves aspect ratio, keeps dimensions even for H.26x, and never upscales a smaller source.
 - **Concurrency**: Swift 6 strict concurrency with `@Observable` and `@MainActor`. Compression runs in background tasks with cancellation support via `Process.terminate()`.
 
 ## Releasing

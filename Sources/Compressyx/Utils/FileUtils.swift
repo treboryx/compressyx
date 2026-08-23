@@ -21,6 +21,41 @@ enum FileUtils {
         return supported_video_types.contains(ext) || supported_image_types.contains(ext)
     }
 
+    static func is_directory(url: URL) -> Bool {
+        var is_dir: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &is_dir)
+        return exists && is_dir.boolValue
+    }
+
+    /// Every ingest path funnels through here so folder support can't regress per-surface.
+    static func expand(urls: [URL]) -> [URL] {
+        var result: [URL] = []
+        for url in urls {
+            if is_directory(url: url) {
+                result.append(contentsOf: supported_files(in: url))
+            } else if is_supported(url: url) {
+                result.append(url)
+            }
+        }
+        return result
+    }
+
+    private static func supported_files(in directory: URL) -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+
+        var found: [URL] = []
+        for case let url as URL in enumerator where is_supported(url: url) {
+            found.append(url)
+        }
+        return found.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+    }
+
     /// TIFF and BMP are decode-only here; keeping their extension would label JPEG bytes as TIFF.
     static func same_as_input_extension(for source: URL) -> String {
         let ext = source.pathExtension.lowercased()

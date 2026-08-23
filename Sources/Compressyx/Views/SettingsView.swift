@@ -61,6 +61,15 @@ struct SettingsView: View {
                         Text(format.rawValue).tag(format)
                     }
                 }
+
+                Picker("Metadata", selection: $settings.metadata_policy) {
+                    ForEach(MetadataPolicy.allCases, id: \.self) { policy in
+                        Text(policy.rawValue).tag(policy)
+                    }
+                }
+                Text(settings.metadata_policy.explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Quality") {

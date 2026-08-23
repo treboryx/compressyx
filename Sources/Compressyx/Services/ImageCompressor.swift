@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 import UniformTypeIdentifiers
 
 enum ImageCompressorError: LocalizedError {
@@ -30,6 +31,7 @@ struct ImageCompressionParams: Sendable {
     let pngquant_range: String
     let output_url: URL
     let target_format: ImageOutputFormat
+    let metadata_policy: MetadataPolicy
 }
 
 enum ImageCompressor {
@@ -80,13 +82,15 @@ enum ImageCompressor {
 
         switch format {
         case .png:
-            try await compress_png(input: input_url, output: params.output_url, pngquant_range: params.pngquant_range, on_process: on_process)
+            try await compress_png(input: input_url, output: params.output_url, pngquant_range: params.pngquant_range, policy: params.metadata_policy, on_process: on_process)
         case .jpeg:
-            try compress_jpeg(input: input_url, output: params.output_url, quality: params.quality)
+            try encode(input: input_url, output: params.output_url, type: .jpeg,
+                       quality: params.quality, policy: params.metadata_policy)
         case .heic:
-            try compress_heif(input: input_url, output: params.output_url, quality: params.quality)
+            try encode(input: input_url, output: params.output_url, type: .heic,
+                       quality: params.quality, policy: params.metadata_policy)
         case .webp:
-            try await compress_webp(input: input_url, output: params.output_url, quality: params.quality, on_process: on_process)
+            try await compress_webp(input: input_url, output: params.output_url, quality: params.quality, policy: params.metadata_policy, on_process: on_process)
         case .same_as_input:
             throw ImageCompressorError.unsupported_format(input_url.pathExtension)
         }
@@ -119,7 +123,7 @@ enum ImageCompressor {
         return (temp, true)
     }
 
-    private static func compress_png(input: URL, output: URL, pngquant_range: String, on_process: @escaping @Sendable (Process) -> Void) async throws {
+    private static func compress_png(input: URL, output: URL, pngquant_range: String, policy: MetadataPolicy, on_process: @escaping @Sendable (Process) -> Void) async throws {
         guard let pngquant = find_pngquant() else {
             throw ImageCompressorError.pngquant_not_found
         }
@@ -133,12 +137,12 @@ enum ImageCompressor {
 
         let process = Process()
         process.executableURL = pngquant
-        process.arguments = [
-            "--quality", pngquant_range,
-            "--force",
-            "--output", output.path,
-            source.url.path
-        ]
+        var arguments = ["--quality", pngquant_range, "--force"]
+        if policy == .strip_all {
+            arguments.append("--strip")
+        }
+        arguments.append(contentsOf: ["--output", output.path, source.url.path])
+        process.arguments = arguments
 
         let stderr_pipe = Pipe()
         process.standardError = stderr_pipe
@@ -163,13 +167,30 @@ enum ImageCompressor {
         }
     }
 
-    private static func compress_webp(input: URL, output: URL, quality: Double, on_process: @escaping @Sendable (Process) -> Void) async throws {
+    private static func compress_webp(input: URL, output: URL, quality: Double, policy: MetadataPolicy, on_process: @escaping @Sendable (Process) -> Void) async throws {
         guard let cwebp = find_cwebp() else {
             throw ImageCompressorError.cwebp_not_found
         }
 
-        // cwebp reads PNG/JPEG/TIFF only, so HEIC and friends go through the PNG transcode.
-        let source = try png_source(for: input)
+        // Pass readable formats through untouched — transcoding would strip the metadata
+        // cwebp is about to copy. Only HEIC and BMP need the PNG bridge.
+        // Stripping everything drops the orientation tag with it, and cwebp never rotates
+        // pixels, so a portrait photo would come out sideways. The PNG bridge bakes the
+        // rotation in, which is exactly what a metadata-free file needs.
+        let readable_directly = ["png", "jpg", "jpeg", "tif", "tiff", "webp"]
+        let pass_through = policy != .strip_all
+            && readable_directly.contains(input.pathExtension.lowercased())
+        var source: (url: URL, is_temporary: Bool) =
+            pass_through ? (input, false) : try png_source(for: input)
+
+        // cwebp's -metadata is all-or-nothing over EXIF, and GPS lives inside it,
+        // so the location has to be gone before cwebp ever sees the file.
+        if policy == .strip_location, let stripped = try? gps_stripped_copy(of: source.url) {
+            if source.is_temporary {
+                try? FileManager.default.removeItem(at: source.url)
+            }
+            source = (stripped, true)
+        }
         defer {
             if source.is_temporary {
                 try? FileManager.default.removeItem(at: source.url)
@@ -178,8 +199,16 @@ enum ImageCompressor {
 
         let process = Process()
         process.executableURL = cwebp
+        let metadata: String
+        switch policy {
+        case .preserve: metadata = "all"
+        case .strip_location: metadata = "exif,icc"
+        case .strip_all: metadata = "none"
+        }
+
         process.arguments = [
             "-q", "\(Int((quality * 100).rounded()))",
+            "-metadata", metadata,
             source.url.path,
             "-o", output.path
         ]
@@ -203,44 +232,80 @@ enum ImageCompressor {
         }
     }
 
-    private static func compress_jpeg(input: URL, output: URL, quality: Double) throws {
-        guard let image = NSImage(contentsOf: input),
-              let tiff_data = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff_data)
+    /// Rewrites the container without re-encoding, so this costs no image quality.
+    private static func gps_stripped_copy(of input: URL) throws -> URL {
+        guard let source = CGImageSourceCreateWithURL(input as CFURL, nil),
+              let type = CGImageSourceGetType(source)
         else {
             throw ImageCompressorError.image_load_failed
         }
 
-        guard let jpeg_data = bitmap.representation(
-            using: .jpeg,
-            properties: [.compressionFactor: quality]
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(input.pathExtension)
+
+        guard let destination = CGImageDestinationCreateWithURL(temp as CFURL, type, 1, nil) else {
+            throw ImageCompressorError.compression_failed("Could not create destination for metadata strip")
+        }
+
+        // kCFNull removes a key rather than overriding it.
+        let overrides = [kCGImagePropertyGPSDictionary: kCFNull] as CFDictionary
+        CGImageDestinationAddImageFromSource(destination, source, 0, overrides)
+
+        guard CGImageDestinationFinalize(destination) else {
+            throw ImageCompressorError.compression_failed("Metadata strip failed")
+        }
+        return temp
+    }
+
+    /// Orientation must survive even a full strip, or portrait photos display sideways.
+    private static func source_properties(_ source: CGImageSource, policy: MetadataPolicy) -> [CFString: Any] {
+        let raw = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+
+        switch policy {
+        case .preserve:
+            return raw
+        case .strip_location:
+            var properties = raw
+            properties.removeValue(forKey: kCGImagePropertyGPSDictionary)
+            return properties
+        case .strip_all:
+            var properties: [CFString: Any] = [:]
+            if let orientation = raw[kCGImagePropertyOrientation] {
+                properties[kCGImagePropertyOrientation] = orientation
+            }
+            return properties
+        }
+    }
+
+    private static func encode(
+        input: URL,
+        output: URL,
+        type: UTType,
+        quality: Double,
+        policy: MetadataPolicy
+    ) throws {
+        guard let source = CGImageSourceCreateWithURL(input as CFURL, nil),
+              let cg_image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else {
+            throw ImageCompressorError.image_load_failed
+        }
+
+        var properties = source_properties(source, policy: policy)
+        properties[kCGImageDestinationLossyCompressionQuality] = quality
+
+        guard let destination = CGImageDestinationCreateWithURL(
+            output as CFURL, type.identifier as CFString, 1, nil
         ) else {
-            throw ImageCompressorError.compression_failed("JPEG encoding failed")
+            throw ImageCompressorError.compression_failed("Could not create \(type.identifier) destination")
         }
 
-        try jpeg_data.write(to: output)
-    }
+        CGImageDestinationAddImage(destination, cg_image, properties as CFDictionary)
 
-    private static func compress_heif(input: URL, output: URL, quality: Double) throws {
-        guard let image = NSImage(contentsOf: input),
-              let tiff_data = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff_data),
-              let cg_image = bitmap.cgImage
-        else {
-            throw ImageCompressorError.image_load_failed
+        guard CGImageDestinationFinalize(destination) else {
+            throw ImageCompressorError.compression_failed("\(type.identifier) encoding failed")
         }
-
-        let ci_image = CIImage(cgImage: cg_image)
-        let context = CIContext()
-        let color_space = cg_image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
-
-        try context.writeHEIFRepresentation(
-            of: ci_image,
-            to: output,
-            format: .RGBA8,
-            colorSpace: color_space,
-            options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality]
-        )
     }
+
 
 }

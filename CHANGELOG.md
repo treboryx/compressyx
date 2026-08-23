@@ -5,13 +5,40 @@ All notable changes to Compressyx are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] — 2026-08-23
 
 ### Added
 
 - Release notes in the update dialog. The appcast now carries the matching
   CHANGELOG section, so Sparkle shows what changed instead of a bare version
   number. Takes effect from the next release.
+- **Folders can be dropped on the app**, and are expanded recursively. Hidden
+  files are skipped and bundles such as `.photoslibrary` are not descended into.
+  The README has claimed this since 1.0.0; it now works.
+- **Metadata control** in Settings — *Preserve*, *Remove location*, or
+  *Remove all*. Previous versions silently stripped every tag from every image,
+  including the capture date, which is how Photos and the Finder sort images.
+  The new default is *Preserve*.
+- **Advanced video options**, behind a collapsed "Advanced" section in the
+  sidebar: downscale to 4K/1440p/1080p/720p/480p, re-encode audio to AAC or
+  remove it, and cap the frame rate. Downscaling never upscales a smaller
+  source. Defaults leave every existing behaviour unchanged.
+
+### Fixed
+
+- **WebM output failed for every video with AAC audio.** The audio track was
+  stream-copied into a container that accepts only Vorbis and Opus, so ffmpeg
+  aborted and no file was produced. WebM now encodes audio as Opus.
+- The main window's dependency check ignored `cwebp`, so a missing WebP encoder
+  went unreported until a job failed.
+- Dropping a folder and one of its own files in the same gesture queued that
+  file twice.
+
+### Changed
+
+- Image metadata defaults changed from "strip everything" to "preserve
+  everything". If you relied on the old behaviour to remove GPS data, choose
+  *Remove location* or *Remove all* in Settings.
 
 ## [1.0.2] — 2026-08-23
 
@@ -75,6 +102,7 @@ and notarized by Apple. Installs and updates without Gatekeeper warnings.
 - Customizable keyboard shortcuts.
 - Automatic updates via Sparkle.
 
+[1.1.0]: https://github.com/treboryx/compressyx/releases/tag/v1.1.0
 [1.0.2]: https://github.com/treboryx/compressyx/releases/tag/v1.0.2
 [1.0.1]: https://github.com/treboryx/compressyx/releases/tag/v1.0.1
 [1.0.0]: https://github.com/treboryx/compressyx/releases/tag/v1.0.0

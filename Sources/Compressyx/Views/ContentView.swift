@@ -11,11 +11,13 @@ struct ContentView: View {
         var deps: [String] = []
         if VideoCompressor.find_ffmpeg() == nil { deps.append("FFmpeg") }
         if ImageCompressor.find_pngquant() == nil { deps.append("pngquant") }
+        if ImageCompressor.find_cwebp() == nil { deps.append("cwebp") }
         return deps
     }
 
     @State private var ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
     @State private var pngquant_installed = ImageCompressor.find_pngquant() != nil
+    @State private var cwebp_installed = ImageCompressor.find_cwebp() != nil
 
     var body: some View {
         NavigationSplitView(columnVisibility: $sidebar_visibility) {
@@ -86,6 +88,43 @@ struct ContentView: View {
                         }
                     }
                     .labelsHidden()
+
+                    DisclosureGroup("Advanced") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Resolution")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Picker("Resolution", selection: $settings.video_resolution) {
+                                ForEach(VideoResolution.allCases, id: \.self) { resolution in
+                                    Text(resolution.rawValue).tag(resolution)
+                                }
+                            }
+                            .labelsHidden()
+
+                            Text("Audio")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Picker("Audio", selection: $settings.audio_handling) {
+                                ForEach(AudioHandling.allCases, id: \.self) { handling in
+                                    Text(handling.rawValue).tag(handling)
+                                }
+                            }
+                            .labelsHidden()
+
+                            Toggle("Cap frame rate", isOn: Binding(
+                                get: { settings.video_fps_cap > 0 },
+                                set: { settings.video_fps_cap = $0 ? 30 : 0 }
+                            ))
+                            .font(.callout)
+
+                            if settings.video_fps_cap > 0 {
+                                Stepper("\(settings.video_fps_cap) fps", value: $settings.video_fps_cap, in: 15...60, step: 5)
+                                    .font(.callout)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    .font(.callout)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -165,8 +204,9 @@ struct ContentView: View {
 
                     dep_row(name: "FFmpeg", installed: ffmpeg_installed)
                     dep_row(name: "pngquant", installed: pngquant_installed)
+                    dep_row(name: "cwebp", installed: cwebp_installed)
 
-                    if !ffmpeg_installed || !pngquant_installed {
+                    if !ffmpeg_installed || !pngquant_installed || !cwebp_installed {
                         Button("Open Settings") {
                             openSettings()
                         }
@@ -182,6 +222,7 @@ struct ContentView: View {
         .onAppear {
             ffmpeg_installed = VideoCompressor.find_ffmpeg() != nil
             pngquant_installed = ImageCompressor.find_pngquant() != nil
+            cwebp_installed = ImageCompressor.find_cwebp() != nil
         }
     }
 
@@ -256,13 +297,12 @@ struct ContentView: View {
     private func open_file_panel() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowedContentTypes = [.movie, .video, .image, .png, .jpeg, .heic, .tiff, .bmp]
 
         if panel.runModal() == .OK {
-            let urls = panel.urls.filter { FileUtils.is_supported(url: $0) }
-            queue.add_files(urls)
+            queue.add_files(panel.urls)
         }
     }
 

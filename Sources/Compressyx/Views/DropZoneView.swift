@@ -15,7 +15,7 @@ struct DropZoneView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(compact ? "Drop more files here" : "Drop videos or images here")
+            Text(compact ? "Drop more files or folders here" : "Drop videos, images, or folders here")
                 .font(compact ? .caption : .title3)
                 .foregroundStyle(.secondary)
 
@@ -47,12 +47,14 @@ struct DropZoneView: View {
     private func handle_drop(_ providers: [NSItemProvider]) {
         for provider in providers {
             _ = provider.loadTransferable(type: URL.self) { result in
-                guard case .success(let url) = result,
-                      FileUtils.is_supported(url: url)
-                else { return }
+                guard case .success(let url) = result else { return }
+
+                // Runs off the main actor deliberately: enumerating a deep tree can be slow.
+                let expanded = FileUtils.expand(urls: [url])
+                guard !expanded.isEmpty else { return }
 
                 Task { @MainActor in
-                    queue.add_files([url])
+                    queue.add_files(expanded)
                 }
             }
         }
